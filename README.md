@@ -3,3 +3,4 @@ A simple discord bot template. This is adapted from [Codeize's template](https:/
 
 ## Todo
 Finish src/bot/events
+Finish lib/classes
