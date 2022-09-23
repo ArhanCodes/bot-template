@@ -1,5 +1,5 @@
 # Bot-Template
-A simple discord bot template that I use for all my TypeScript bots. This is adapted from [Codeize's template](https://github.com/Codeize/template). 
+A template for discord bots written in TypeScript. This is adapted from [Codeize's template](https://github.com/Codeize/template). 
 
 
 
