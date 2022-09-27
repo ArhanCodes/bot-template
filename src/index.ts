@@ -46,9 +46,9 @@ if (process.env.NODE_ENV !== "development") {
 const statcord = new ShardingClient({
     key: `${process.env.STATCORD_API_KEY}`,
     manager,
-    postCpuStatistics: true, // Whether to post CPU statistics or not
-    postMemStatistics: true, // Whether to post memory statistics or not
-    postNetworkStatistics: true, // Whether to post memory statistics or not 
+    postCpuStatistics: true, // Whether to post CPU statistics.
+    postMemStatistics: true, // Whether to post memory statistics.
+    postNetworkStatistics: true, // Whether to post network statistics.
     autopost: true
 });
 
