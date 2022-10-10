@@ -5,7 +5,7 @@ A template for discord bots that are written in TypeScript. This is adapted from
 
 ### Commands
 
--   Create a new file to `src/bot/slashCommands/`.
+-   Create a new file to `src/bot/slashCommands`.
 -   Open your file.
 -   Add command template.
 
