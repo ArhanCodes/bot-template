@@ -1,13 +1,11 @@
 # Bot-Template
 A template for discord bots that are written in TypeScript. This is adapted from [Codeize's template](https://github.com/Codeize/template). 
 
-## Creating Commands & Events
-
-### Commands
+### Creating Commands
 
 -   Create a new file to `src/bot/slashCommands`.
 -   Open your file.
--   Add command template.
+-   Add this command template.
 
 ```ts
 import { ChatInputCommandInteraction, Colors } from "discord.js";
