@@ -1,38 +1,36 @@
 # Bot-Template
-A template for discord bots that are written in TypeScript. This is adapted from [Codeize's template](https://github.com/Codeize/template), with some changes to the code + added commands.
+A template for discord bots that are written in TypeScript. This is adapted from [Codeize's template](https://github.com/Codeize/template), with some changes to the code.
 
-### Creating Commands
+### Command Template
 
--   Create a new file to `src/bot/slashCommands`.
--   Open your file.
--   Add this command template.
+An example ping command template.
 
-```ts
-import { ChatInputCommandInteraction, Colors } from "discord.js";
-import { SlashCommandBuilder } from "@discordjs/builders";
+```
+import { ChatInputCommandInteraction, Message, ApplicationCommandType } from "discord.js";
 import ApplicationCommand from "../../../../lib/classes/ApplicationCommand.js";
 import BetterClient from "../../../../lib/extensions/BetterClient.js";
 
-import Command from "../../structures/Command";
-import DiscordClient from "../../structures/DiscordClient";
-
-export default class ExampleCommand extends Command {
-    constructor(client: DiscordClient) {
-        super(
-            client,
-            {
-                group: "Developer",
-                require: {
-                    developer: true,
-                },
-            },
-            new SlashCommandBuilder().setName("example").setDescription("An example command.")
-        );
+export default class Ping extends ApplicationCommand {
+    constructor(client: BetterClient) {
+        super("ping", client, {
+            type: ApplicationCommandType.ChatInput,
+            description: `Pong! Get the current ping / latency of ${client.config.botName}.`
+        });
     }
 
-    async run(command: ChatInputCommandInteraction) {
-        await command.reply("Wow, example command working!");
+    override async run(interaction: ChatInputCommandInteraction) {
+        const message = (await interaction.reply({
+            content: "Ping?",
+            fetchReply: true
+        })) as unknown as Message;
+        const hostLatency =
+            message.createdTimestamp - interaction.createdTimestamp;
+        const apiLatency = Math.round(this.client.ws.ping);
+        return interaction.editReply({
+            content: `Pong! Round trip took ${(
+                hostLatency + apiLatency
+            ).toLocaleString()}ms. (Host latency is ${hostLatency.toLocaleString()} and API latency is ${apiLatency.toLocaleString()}ms)`
+        });
     }
 }
 ```
-> I've made an example `/ping` command [here](https://github.com/ArhanCodes/Bot-Template/blob/main/src/bot/slashCommands/ping.ts).
