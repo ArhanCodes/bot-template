@@ -1,0 +1,136 @@
+-- Discord bot template, written in pure Quill.
+-- Commands: /ping, /ban, /kick, /timeout
+--
+-- Run: quill run bot.quill
+-- Requires: DISCORD_TOKEN and DISCORD_CLIENT_ID in .env
+
+use "discord.js" as Discord
+use "dotenv/config" as _
+
+token is process.env.DISCORD_TOKEN
+clientId is process.env.DISCORD_CLIENT_ID
+
+if not token or not clientId:
+  say "Missing DISCORD_TOKEN or DISCORD_CLIENT_ID in .env"
+  process.exit(1)
+
+intents is [Discord.GatewayIntentBits.Guilds, Discord.GatewayIntentBits.GuildMembers, Discord.GatewayIntentBits.GuildModeration]
+
+bot is new Discord.Client({intents: intents})
+
+Perms is Discord.PermissionFlagsBits
+
+-- Helper: build a slash command for a moderation action.
+-- targetLabel is the description shown next to the user option.
+to modCommand name desc perm targetLabel includeMinutes:
+  cmd is new Discord.SlashCommandBuilder()
+  cmd.setName(name)
+  cmd.setDescription(desc)
+  cmd.setDefaultMemberPermissions(perm)
+  cmd.addUserOption(with opt: opt.setName("user").setDescription(targetLabel).setRequired(yes))
+  if includeMinutes:
+    cmd.addIntegerOption(with opt: opt.setName("minutes").setDescription("How long to timeout, in minutes (max 40320 = 28 days)").setMinValue(1).setMaxValue(40320).setRequired(yes))
+  cmd.addStringOption(with opt: opt.setName("reason").setDescription("Reason (optional)").setRequired(no))
+  give back cmd
+
+to buildCommands:
+  ping is new Discord.SlashCommandBuilder()
+  ping.setName("ping")
+  ping.setDescription("Pong, returns the bot's latency.")
+
+  ban is modCommand("ban", "Ban a user from the server.", Perms.BanMembers, "Member to ban", no)
+  kick is modCommand("kick", "Kick a user from the server.", Perms.KickMembers, "Member to kick", no)
+  timeout is modCommand("timeout", "Timeout a user using Discord's native timeout feature.", Perms.ModerateMembers, "Member to timeout", yes)
+
+  give back [ping.toJSON(), ban.toJSON(), kick.toJSON(), timeout.toJSON()]
+
+-- Register slash commands with Discord on startup.
+bot.on("ready", with:
+  say "Logged in as {bot.user.tag}"
+  rest is new Discord.REST({version: "10"})
+  rest.setToken(token)
+  try:
+    body is buildCommands()
+    await rest.put(Discord.Routes.applicationCommands(clientId), {body: body})
+    say "Registered {body.length} slash commands."
+  if it fails err:
+    say "Failed to register commands: {err}"
+)
+
+-- Helper: print a one-line audit entry to stdout.
+to logAction action ix target reason:
+  base is "{action} | by {ix.user.tag} ({ix.user.id}) | target {target.tag} ({target.id})"
+  if reason and reason.length is greater than 0:
+    say "{base} | reason: {reason}"
+  otherwise:
+    say base
+
+-- Dispatch slash command interactions.
+bot.on("interactionCreate", with ix:
+  if not ix.isChatInputCommand():
+    give back nothing
+
+  name is ix.commandName
+
+  if name is "ping":
+    sent is await ix.reply({content: "Pinging...", fetchReply: yes})
+    roundTrip is sent.createdTimestamp - ix.createdTimestamp
+    apiPing is Math.round(bot.ws.ping)
+    await ix.editReply("Pong! Round-trip {roundTrip}ms, websocket {apiPing}ms.")
+    give back nothing
+
+  if name is "ban":
+    user is ix.options.getUser("user")
+    reason is ix.options.getString("reason") or "No reason provided"
+    member is await ix.guild.members.fetch(user.id).catch(with: nothing)
+    if member and not member.bannable:
+      await ix.reply({content: "I cannot ban that user (missing permissions or role hierarchy).", ephemeral: yes})
+      give back nothing
+    try:
+      await ix.guild.members.ban(user.id, {reason: reason})
+      logAction("BAN", ix, user, reason)
+      await ix.reply("Banned {user.tag}. Reason: {reason}")
+    if it fails err:
+      await ix.reply({content: "Ban failed: {err.message}", ephemeral: yes})
+    give back nothing
+
+  if name is "kick":
+    user is ix.options.getUser("user")
+    reason is ix.options.getString("reason") or "No reason provided"
+    member is await ix.guild.members.fetch(user.id).catch(with: nothing)
+    if not member:
+      await ix.reply({content: "User is not in this server.", ephemeral: yes})
+      give back nothing
+    if not member.kickable:
+      await ix.reply({content: "I cannot kick that user (missing permissions or role hierarchy).", ephemeral: yes})
+      give back nothing
+    try:
+      await member.kick(reason)
+      logAction("KICK", ix, user, reason)
+      await ix.reply("Kicked {user.tag}. Reason: {reason}")
+    if it fails err:
+      await ix.reply({content: "Kick failed: {err.message}", ephemeral: yes})
+    give back nothing
+
+  if name is "timeout":
+    user is ix.options.getUser("user")
+    minutes is ix.options.getInteger("minutes")
+    reason is ix.options.getString("reason") or "No reason provided"
+    member is await ix.guild.members.fetch(user.id).catch(with: nothing)
+    if not member:
+      await ix.reply({content: "User is not in this server.", ephemeral: yes})
+      give back nothing
+    if not member.moderatable:
+      await ix.reply({content: "I cannot timeout that user (missing permissions or role hierarchy).", ephemeral: yes})
+      give back nothing
+    durationMs is minutes * 60 * 1000
+    try:
+      await member.timeout(durationMs, reason)
+      logAction("TIMEOUT {minutes}m", ix, user, reason)
+      await ix.reply("Timed out {user.tag} for {minutes} minute(s). Reason: {reason}")
+    if it fails err:
+      await ix.reply({content: "Timeout failed: {err.message}", ephemeral: yes})
+    give back nothing
+)
+
+bot.login(token)

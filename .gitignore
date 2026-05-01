@@ -106,3 +106,8 @@ dist
 
 .vscode/
 .idea/
+
+# Quill bot template
+.env
+bot.js
+bot.js.map
