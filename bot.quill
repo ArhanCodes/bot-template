@@ -25,6 +25,34 @@ to modCommand name desc perm targetLabel includeMinutes:
   cmd.addStringOption(with opt: opt.setName("reason").setDescription("Reason (optional)").setRequired(no))
   give back cmd
 
+to buildTicketCommand:
+  cmd is new Discord.SlashCommandBuilder()
+  cmd.setName("ticket")
+  cmd.setDescription("Ticket system commands")
+  cmd.setDefaultMemberPermissions(Perms.ManageChannels)
+  cmd.addSubcommand(with sub: sub.setName("setup").setDescription("Post a ticket panel in this channel"))
+  cmd.addSubcommand(with sub: sub.setName("close").setDescription("Close the current ticket channel"))
+  give back cmd
+
+to buildRolesCommand:
+  cmd is new Discord.SlashCommandBuilder()
+  cmd.setName("roles")
+  cmd.setDescription("Self-assignable role commands")
+  cmd.setDefaultMemberPermissions(Perms.ManageRoles)
+  cmd.addSubcommand(with sub:
+    sub.setName("post")
+    sub.setDescription("Post a role-selection message")
+    sub.addStringOption(with o: o.setName("title").setDescription("Title for the embed").setRequired(yes))
+    sub.addRoleOption(with o: o.setName("role1").setDescription("First selectable role").setRequired(yes))
+    sub.addStringOption(with o: o.setName("description").setDescription("Description (optional)").setRequired(no))
+    sub.addRoleOption(with o: o.setName("role2").setDescription("Second selectable role").setRequired(no))
+    sub.addRoleOption(with o: o.setName("role3").setDescription("Third selectable role").setRequired(no))
+    sub.addRoleOption(with o: o.setName("role4").setDescription("Fourth selectable role").setRequired(no))
+    sub.addRoleOption(with o: o.setName("role5").setDescription("Fifth selectable role").setRequired(no))
+    give back sub
+  )
+  give back cmd
+
 to buildCommands:
   ping is new Discord.SlashCommandBuilder()
   ping.setName("ping")
@@ -33,8 +61,10 @@ to buildCommands:
   ban is modCommand("ban", "Ban a user from the server.", Perms.BanMembers, "Member to ban", no)
   kick is modCommand("kick", "Kick a user from the server.", Perms.KickMembers, "Member to kick", no)
   timeout is modCommand("timeout", "Timeout a user using Discord's native timeout feature.", Perms.ModerateMembers, "Member to timeout", yes)
+  ticket is buildTicketCommand()
+  roles is buildRolesCommand()
 
-  give back [ping.toJSON(), ban.toJSON(), kick.toJSON(), timeout.toJSON()]
+  give back [ping.toJSON(), ban.toJSON(), kick.toJSON(), timeout.toJSON(), ticket.toJSON(), roles.toJSON()]
 
 bot.on("ready", with:
   say "Logged in as {bot.user.tag}"
@@ -55,7 +85,120 @@ to logAction action ix target reason:
   otherwise:
     say base
 
+to ticketPanelComponents:
+  row is new Discord.ActionRowBuilder()
+  btn is new Discord.ButtonBuilder()
+  btn.setCustomId("ticket-create")
+  btn.setLabel("Open a ticket")
+  btn.setStyle(Discord.ButtonStyle.Primary)
+  btn.setEmoji("🎫")
+  row.addComponents(btn)
+  give back [row]
+
+to ticketCloseComponents:
+  row is new Discord.ActionRowBuilder()
+  btn is new Discord.ButtonBuilder()
+  btn.setCustomId("ticket-close")
+  btn.setLabel("Close ticket")
+  btn.setStyle(Discord.ButtonStyle.Danger)
+  btn.setEmoji("🔒")
+  row.addComponents(btn)
+  give back [row]
+
+to roleButtonStyleFor index:
+  styles is [Discord.ButtonStyle.Primary, Discord.ButtonStyle.Success, Discord.ButtonStyle.Secondary, Discord.ButtonStyle.Primary, Discord.ButtonStyle.Success]
+  give back styles[index % 5]
+
+to rolePostComponents roleList:
+  row is new Discord.ActionRowBuilder()
+  i is 0
+  for each role in roleList:
+    btn is new Discord.ButtonBuilder()
+    btn.setCustomId("role-toggle-{role.id}")
+    btn.setLabel(role.name)
+    btn.setStyle(roleButtonStyleFor(i))
+    row.addComponents(btn)
+    i is i + 1
+  give back [row]
+
+to collectRoleOptions ix:
+  collected is []
+  names is ["role1", "role2", "role3", "role4", "role5"]
+  for each n in names:
+    r is ix.options.getRole(n)
+    if r:
+      collected.push(r)
+  give back collected
+
 bot.on("interactionCreate", with ix:
+  if ix.isButton():
+    cid is ix.customId
+
+    if cid is "ticket-create":
+      try:
+        existing is ix.guild.channels.cache.find(with c: c.name is "ticket-{ix.user.id}")
+        if existing:
+          await ix.reply({content: "You already have an open ticket: <#{existing.id}>", ephemeral: yes})
+          give back nothing
+        overwrites is [
+          {id: ix.guild.id, deny: [Perms.ViewChannel]},
+          {id: ix.user.id, allow: [Perms.ViewChannel, Perms.SendMessages, Perms.ReadMessageHistory]},
+          {id: bot.user.id, allow: [Perms.ViewChannel, Perms.SendMessages, Perms.ManageChannels, Perms.ReadMessageHistory]}
+        ]
+        channel is await ix.guild.channels.create({
+          name: "ticket-{ix.user.id}",
+          type: Discord.ChannelType.GuildText,
+          topic: "Ticket opened by {ix.user.tag} ({ix.user.id})",
+          permissionOverwrites: overwrites
+        })
+        embed is new Discord.EmbedBuilder()
+        embed.setTitle("Ticket opened")
+        embed.setDescription("Hey <@{ix.user.id}>, a staff member will be with you shortly. Use the button below to close this ticket when you are done.")
+        embed.setColor(0x5865F2)
+        await channel.send({content: "<@{ix.user.id}>", embeds: [embed], components: ticketCloseComponents()})
+        await ix.reply({content: "Ticket created: <#{channel.id}>", ephemeral: yes})
+        say "TICKET OPEN | {ix.user.tag} ({ix.user.id}) | #{channel.name}"
+      if it fails err:
+        await ix.reply({content: "Could not create ticket: {err.message}", ephemeral: yes})
+      give back nothing
+
+    if cid is "ticket-close":
+      ch is ix.channel
+      if not ch.name.startsWith("ticket-"):
+        await ix.reply({content: "This is not a ticket channel.", ephemeral: yes})
+        give back nothing
+      try:
+        await ix.reply({content: "Closing ticket in 3 seconds..."})
+        await new Promise(with resolve: setTimeout(resolve, 3000))
+        say "TICKET CLOSE | {ix.user.tag} ({ix.user.id}) | #{ch.name}"
+        await ch["delete"]("Ticket closed by {ix.user.tag}")
+      if it fails err:
+        await ix.followUp({content: "Could not close ticket: {err.message}", ephemeral: yes}).catch(with: nothing)
+      give back nothing
+
+    if cid.startsWith("role-toggle-"):
+      roleId is cid.slice(12)
+      member is ix.member
+      role is await ix.guild.roles.fetch(roleId).catch(with: nothing)
+      if not role:
+        await ix.reply({content: "That role no longer exists.", ephemeral: yes})
+        give back nothing
+      if role.position is greater than or equal to ix.guild.members.me.roles.highest.position:
+        await ix.reply({content: "I cannot manage that role (it is above my highest role).", ephemeral: yes})
+        give back nothing
+      try:
+        if member.roles.cache.has(roleId):
+          await member.roles.remove(roleId, "Self-removed via roles panel")
+          await ix.reply({content: "Removed **{role.name}**.", ephemeral: yes})
+        otherwise:
+          await member.roles.add(roleId, "Self-added via roles panel")
+          await ix.reply({content: "Added **{role.name}**.", ephemeral: yes})
+      if it fails err:
+        await ix.reply({content: "Could not toggle role: {err.message}", ephemeral: yes})
+      give back nothing
+
+    give back nothing
+
   if not ix.isChatInputCommand():
     give back nothing
 
@@ -119,6 +262,61 @@ bot.on("interactionCreate", with ix:
       await ix.reply("Timed out {user.tag} for {minutes} minute(s). Reason: {reason}")
     if it fails err:
       await ix.reply({content: "Timeout failed: {err.message}", ephemeral: yes})
+    give back nothing
+
+  if name is "ticket":
+    sub is ix.options.getSubcommand()
+    if sub is "setup":
+      try:
+        embed is new Discord.EmbedBuilder()
+        embed.setTitle("Need help?")
+        embed.setDescription("Click the button below to open a private ticket with the staff team.")
+        embed.setColor(0x5865F2)
+        await ix.channel.send({embeds: [embed], components: ticketPanelComponents()})
+        await ix.reply({content: "Ticket panel posted.", ephemeral: yes})
+      if it fails err:
+        await ix.reply({content: "Could not post panel: {err.message}", ephemeral: yes})
+      give back nothing
+    if sub is "close":
+      ch is ix.channel
+      if not ch.name.startsWith("ticket-"):
+        await ix.reply({content: "This is not a ticket channel.", ephemeral: yes})
+        give back nothing
+      try:
+        await ix.reply({content: "Closing ticket in 3 seconds..."})
+        await new Promise(with resolve: setTimeout(resolve, 3000))
+        say "TICKET CLOSE | {ix.user.tag} ({ix.user.id}) | #{ch.name}"
+        await ch["delete"]("Ticket closed by {ix.user.tag}")
+      if it fails err:
+        await ix.followUp({content: "Could not close ticket: {err.message}", ephemeral: yes}).catch(with: nothing)
+      give back nothing
+    give back nothing
+
+  if name is "roles":
+    sub is ix.options.getSubcommand()
+    if sub is "post":
+      title is ix.options.getString("title")
+      description is ix.options.getString("description") or "Click a button below to add or remove that role."
+      collected is collectRoleOptions(ix)
+      botMember is ix.guild.members.me
+      botHighest is botMember.roles.highest.position
+      bad is []
+      for each r in collected:
+        if r.position is greater than or equal to botHighest:
+          bad.push(r.name)
+      if bad.length is greater than 0:
+        await ix.reply({content: "I cannot assign these roles (they are at or above my highest role): {bad.join(', ')}. Move my role above them and try again.", ephemeral: yes})
+        give back nothing
+      try:
+        embed is new Discord.EmbedBuilder()
+        embed.setTitle(title)
+        embed.setDescription(description)
+        embed.setColor(0x57F287)
+        await ix.channel.send({embeds: [embed], components: rolePostComponents(collected)})
+        await ix.reply({content: "Role panel posted with {collected.length} role(s).", ephemeral: yes})
+      if it fails err:
+        await ix.reply({content: "Could not post panel: {err.message}", ephemeral: yes})
+      give back nothing
     give back nothing
 )
 

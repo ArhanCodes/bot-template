@@ -10,6 +10,8 @@ The whole bot lives in one file, [`bot.quill`](./bot.quill)
 - `/ban` bans a user from the server
 - `/kick` kicks a user from the server
 - `/timeout` times out a user using Discord's native timeout, up to 28 days
+- `/ticket setup` posts a ticket panel in the current channel. Members click the button to open a private channel with staff. `/ticket close` deletes the current ticket
+- `/roles post` posts a role-selection embed with up to 5 roles. Members click a button to add or remove that role from themselves
 
 Each moderation command checks Discord permissions and role hierarchy before acting
 
@@ -23,7 +25,7 @@ npm install -g @tradebuddyhq/quill
 
 2. Create a Discord application at https://discord.com/developers/applications and copy the bot token and the application client id
 
-3. Invite the bot to your server with the `applications.commands` and `bot` scopes, plus the `Ban Members`, `Kick Members`, and `Moderate Members` permissions
+3. Invite the bot to your server with the `applications.commands` and `bot` scopes, plus the `Ban Members`, `Kick Members`, `Moderate Members`, `Manage Channels`, and `Manage Roles` permissions. Make sure the bot's role is above any role you plan to make self-assignable
 
 4. Set environment variables
 
