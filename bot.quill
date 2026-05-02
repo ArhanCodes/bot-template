@@ -3,6 +3,7 @@ use "dotenv/config" as _
 
 token is process.env.DISCORD_TOKEN
 clientId is process.env.DISCORD_CLIENT_ID
+guildId is process.env.GUILD_ID
 
 if not token or not clientId:
   say "Missing DISCORD_TOKEN or DISCORD_CLIENT_ID in .env"
@@ -58,13 +59,17 @@ to buildCommands:
   ping.setName("ping")
   ping.setDescription("Pong, returns the bot's latency.")
 
+  help is new Discord.SlashCommandBuilder()
+  help.setName("help")
+  help.setDescription("List every command this bot supports.")
+
   ban is modCommand("ban", "Ban a user from the server.", Perms.BanMembers, "Member to ban", no)
   kick is modCommand("kick", "Kick a user from the server.", Perms.KickMembers, "Member to kick", no)
   timeout is modCommand("timeout", "Timeout a user using Discord's native timeout feature.", Perms.ModerateMembers, "Member to timeout", yes)
   ticket is buildTicketCommand()
   roles is buildRolesCommand()
 
-  give back [ping.toJSON(), ban.toJSON(), kick.toJSON(), timeout.toJSON(), ticket.toJSON(), roles.toJSON()]
+  give back [ping.toJSON(), help.toJSON(), ban.toJSON(), kick.toJSON(), timeout.toJSON(), ticket.toJSON(), roles.toJSON()]
 
 bot.on("ready", with:
   say "Logged in as {bot.user.tag}"
@@ -72,8 +77,12 @@ bot.on("ready", with:
   rest.setToken(token)
   try:
     body is buildCommands()
-    await rest.put(Discord.Routes.applicationCommands(clientId), {body: body})
-    say "Registered {body.length} slash commands."
+    if guildId and guildId.length is greater than 0:
+      await rest.put(Discord.Routes.applicationGuildCommands(clientId, guildId), {body: body})
+      say "Registered {body.length} commands to guild {guildId} (instant updates)."
+    otherwise:
+      await rest.put(Discord.Routes.applicationCommands(clientId), {body: body})
+      say "Registered {body.length} commands globally (can take up to 1 hour to appear)."
   if it fails err:
     say "Failed to register commands: {err}"
 )
@@ -209,6 +218,24 @@ bot.on("interactionCreate", with ix:
     roundTrip is sent.createdTimestamp - ix.createdTimestamp
     apiPing is Math.round(bot.ws.ping)
     await ix.editReply("Pong! Round-trip {roundTrip}ms, websocket {apiPing}ms.")
+    give back nothing
+
+  if name is "help":
+    embed is new Discord.EmbedBuilder()
+    embed.setTitle("Commands")
+    embed.setColor(0x5865F2)
+    embed.setDescription("Slash commands available on this bot.")
+    embed.addFields(
+      {name: "/ping", value: "Returns the bot's latency."},
+      {name: "/help", value: "Shows this list."},
+      {name: "/ban", value: "Ban a user. Requires Ban Members."},
+      {name: "/kick", value: "Kick a user. Requires Kick Members."},
+      {name: "/timeout", value: "Timeout a user up to 28 days. Requires Moderate Members."},
+      {name: "/ticket setup", value: "Post a ticket panel in this channel. Requires Manage Channels."},
+      {name: "/ticket close", value: "Close the current ticket channel."},
+      {name: "/roles post", value: "Post a self-assignable role panel with up to 5 roles. Requires Manage Roles."}
+    )
+    await ix.reply({embeds: [embed], ephemeral: yes})
     give back nothing
 
   if name is "ban":

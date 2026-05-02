@@ -4,9 +4,12 @@ A Discord bot template written in pure [Quill](https://github.com/tradebuddyhq/q
 
 The whole bot lives in one file, [`bot.quill`](./bot.quill)
 
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?repository=https://github.com/ArhanCodes/bot-template)
+
 ## Commands
 
 - `/ping` returns the bot's latency
+- `/help` lists every command
 - `/ban` bans a user from the server
 - `/kick` kicks a user from the server
 - `/timeout` times out a user using Discord's native timeout, up to 28 days
@@ -25,14 +28,23 @@ npm install -g @tradebuddyhq/quill
 
 2. Create a Discord application at https://discord.com/developers/applications and copy the bot token and the application client id
 
-3. Invite the bot to your server with the `applications.commands` and `bot` scopes, plus the `Ban Members`, `Kick Members`, `Moderate Members`, `Manage Channels`, and `Manage Roles` permissions. Make sure the bot's role is above any role you plan to make self-assignable
+3. Invite the bot. Replace `YOUR_CLIENT_ID` with your application client id and open the link in a browser
 
-4. Set environment variables
-
-```bash
-export DISCORD_TOKEN="your-bot-token"
-export DISCORD_CLIENT_ID="your-application-client-id"
 ```
+https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=1099780156438&scope=bot+applications.commands
+```
+
+The permission integer covers Ban Members, Kick Members, Moderate Members, Manage Channels, Manage Roles, Manage Messages, View Channel, Send Messages, Embed Links, and Read Message History. Drag the bot's role above any role you plan to make self-assignable
+
+4. Create a `.env` file. Copy `.env.example` and fill in the values
+
+```
+DISCORD_TOKEN=your-bot-token
+DISCORD_CLIENT_ID=your-application-client-id
+GUILD_ID=
+```
+
+`GUILD_ID` is optional. If you set it during development, slash commands register to that one server and update instantly. Leave it blank in production to register globally (which can take up to an hour to propagate)
 
 5. Install dependencies and run
 
@@ -40,6 +52,8 @@ export DISCORD_CLIENT_ID="your-application-client-id"
 npm install
 quill run bot.quill
 ```
+
+You should see `Logged in as your-bot#0000` and `Registered 7 commands ...` in the terminal
 
 ## What it looks like
 
@@ -64,11 +78,9 @@ The included `Dockerfile` is all you need. It compiles the Quill source to JavaS
 
 ### Railway
 
-1. Fork this repo
-2. Go to https://railway.app, click New Project, then Deploy from GitHub Repo
-3. Pick the fork
-4. Add `DISCORD_TOKEN` and `DISCORD_CLIENT_ID` as variables
-5. Done
+1. Click the Deploy on Railway button at the top of this README
+2. Add `DISCORD_TOKEN` and `DISCORD_CLIENT_ID` as variables
+3. Done
 
 ### Fly.io
 
@@ -93,6 +105,16 @@ DISCORD_TOKEN=... DISCORD_CLIENT_ID=... quill run bot.quill
 ```
 
 Use `pm2` or a systemd service to keep it running
+
+## Setting environment variables on different shells
+
+Bash, zsh, or a `.env` file are easiest. If you must set them in a shell session
+
+- macOS or Linux: `export DISCORD_TOKEN=...`
+- Windows PowerShell: `$env:DISCORD_TOKEN="..."`
+- Windows CMD: `set DISCORD_TOKEN=...`
+
+The `dotenv/config` import in `bot.quill` reads `.env` automatically so you usually do not need any of these
 
 ## Adding a command
 
