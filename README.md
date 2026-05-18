@@ -1,8 +1,6 @@
 # bot-template
 
-A Discord bot template written in pure [Quill](https://github.com/tradebuddyhq/quill)
-
-The whole bot lives in one file, [`bot.quill`](./bot.quill)
+A Discord bot template written in [Quill](https://quill.tradebuddy.dev)
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?repository=https://github.com/ArhanCodes/bot-template)
 
@@ -123,6 +121,3 @@ Two steps, both inside `bot.quill`
 1. Build a new `SlashCommandBuilder` inside `buildCommands` and add `.toJSON()` of it to the returned list
 2. Add an `if name is "yourcommand":` branch inside the `interactionCreate` handler
 
-## License
-
-MIT, see [LICENSE](./LICENSE)
